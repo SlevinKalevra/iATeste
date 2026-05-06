@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/IATeste.Application/IATeste.Application.csproj" />
+    <Project Path="src/IATeste.Domain/IATeste.Domain.csproj" />
+    <Project Path="src/IATeste.Infrastructure/IATeste.Infrastructure.csproj" />
+    <Project Path="src/IATeste.Web/IATeste.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/IATeste.Application.Tests/IATeste.Application.Tests.csproj" />
+  </Folder>
+</Solution>
