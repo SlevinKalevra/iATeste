@@ -1,7 +1,147 @@
-﻿@page "/"
+@page "/"
+@using IATeste.Application.Abstractions
+@using IATeste.Application.Models
+@using IATeste.Domain.Entities
+@using IATeste.Domain.Enums
+@inject IInvestmentSignalService InvestmentSignalService
 
-<PageTitle>Home</PageTitle>
+<PageTitle>Sinais de Investimento com IA + RAG</PageTitle>
 
-<h1>Hello, world!</h1>
+<h1 class="mb-3">Plataforma de Sinais de Investimento</h1>
+<p>Analise notícias geopolíticas, políticas e naturais usando IA + contexto histórico (RAG).</p>
 
-Welcome to your new app.
+<EditForm Model="Model" OnValidSubmit="AnalyzeAsync" class="card p-3 mb-4 shadow-sm">
+    <DataAnnotationsValidator />
+
+    <div class="mb-3">
+        <label class="form-label">Título da notícia</label>
+        <InputText @bind-Value="Model.Title" class="form-control" />
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Descrição</label>
+        <InputTextArea @bind-Value="Model.Description" class="form-control" rows="4" />
+    </div>
+
+    <div class="row">
+        <div class="col-md-6 mb-3">
+            <label class="form-label">Região</label>
+            <InputText @bind-Value="Model.Region" class="form-control" />
+        </div>
+        <div class="col-md-6 mb-3">
+            <label class="form-label">Tags (separadas por vírgula)</label>
+            <InputText @bind-Value="Model.TagsCsv" class="form-control" />
+        </div>
+    </div>
+
+    <button class="btn btn-primary" type="submit" disabled="@IsLoading">
+        @(IsLoading ? "Analisando..." : "Gerar sinais")
+    </button>
+</EditForm>
+
+@if (!string.IsNullOrWhiteSpace(ErrorMessage))
+{
+    <div class="alert alert-danger">@ErrorMessage</div>
+}
+
+@if (Signals is not null)
+{
+    <section class="mb-4">
+        <h2>Sinais sugeridos</h2>
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Ativo</th>
+                        <th>Direção</th>
+                        <th>Confiança</th>
+                        <th>Justificativa</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var signal in Signals)
+                    {
+                        <tr>
+                            <td>@signal.Asset</td>
+                            <td>
+                                <span class="badge @GetDirectionClass(signal.Direction)">@signal.Direction</span>
+                            </td>
+                            <td>@(signal.Confidence * 100m)%</td>
+                            <td>@signal.Reason</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
+}
+
+@if (HistoricalContexts is not null && HistoricalContexts.Count > 0)
+{
+    <section>
+        <h2>Contexto histórico recuperado (RAG)</h2>
+        <div class="row g-3">
+            @foreach (var context in HistoricalContexts)
+            {
+                <div class="col-md-6">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">@context.Event</h5>
+                            <h6 class="card-subtitle mb-2 text-muted">@context.Region · @context.Date.ToString("yyyy-MM-dd")</h6>
+                            <p class="card-text">@context.Summary</p>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </section>
+}
+
+@code {
+    private readonly AnalyzeNewsRequestViewModel Model = new();
+    private IReadOnlyCollection<AssetSignal>? Signals;
+    private IReadOnlyCollection<HistoricalContext>? HistoricalContexts;
+    private bool IsLoading;
+    private string? ErrorMessage;
+
+    private async Task AnalyzeAsync()
+    {
+        ErrorMessage = null;
+        IsLoading = true;
+
+        try
+        {
+            var response = await InvestmentSignalService.AnalyzeNewsAsync(new AnalyzeNewsRequest(
+                Model.Title,
+                Model.Description,
+                Model.Region,
+                Model.TagsCsv));
+
+            Signals = response.Signals;
+            HistoricalContexts = response.HistoricalContexts;
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private static string GetDirectionClass(SignalDirection direction) => direction switch
+    {
+        SignalDirection.Up => "bg-success",
+        SignalDirection.Down => "bg-danger",
+        _ => "bg-secondary"
+    };
+
+    private sealed class AnalyzeNewsRequestViewModel
+    {
+        public string Title { get; set; } = "Escalada de conflito em país produtor de petróleo";
+        public string Description { get; set; } = "A tensão militar aumentou o risco de interrupção no fornecimento energético global.";
+        public string Region { get; set; } = "Oriente Médio";
+        public string TagsCsv { get; set; } = "guerra, petróleo, energia";
+    }
+}
